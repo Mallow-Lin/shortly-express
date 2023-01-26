@@ -79,6 +79,7 @@ app.post('/links',
 app.post('/signup', (request, response) => {
   var username = request.body.username;
   var password = request.body.password;
+
   models.Users.create( {username, password} )
     .then(() => {
       response.status(201);
@@ -90,12 +91,22 @@ app.post('/signup', (request, response) => {
 });
 
 app.post('/login', (request, response) => {
-  console.log(request.body);
   var attemptedUsername = request.body.username;
   var attemptedPassword = request.body.password;
-  //get the username, compare user info
-  //if success, next path/route
-  //else, stay at login
+
+  models.Users.get({username: attemptedUsername})
+    .then((data) => {
+      var success = models.Users.compare(attemptedPassword, data.password, data.salt);
+      if (success) {
+        response.redirect('/');
+      } else {
+        response.redirect('/login');
+      }
+    })
+    .catch(() => {
+      response.redirect('/login');
+    });
+
 });
 /************************************************************/
 // Handle the code parameter route last - if all other routes fail
