@@ -106,7 +106,6 @@ app.post('/login', (request, response) => {
     .catch(() => {
       response.redirect('/login');
     });
-
 });
 /************************************************************/
 // Handle the code parameter route last - if all other routes fail
