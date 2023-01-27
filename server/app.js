@@ -76,35 +76,34 @@ app.post('/links',
 /************************************************************/
 // Write your authentication routes here
 /************************************************************/
-app.post('/signup', (request, response) => {
-  var username = request.body.username;
-  var password = request.body.password;
+app.post('/signup', (req, res) => {
+  var username = req.body.username;
+  var password = req.body.password;
 
   models.Users.create( {username, password} )
     .then(() => {
-      response.status(201);
-      response.redirect('/');
+      res.redirect('/');
     })
     .catch(() => {
-      response.redirect('/signup');
+      res.redirect('/signup');
     });
 });
 
-app.post('/login', (request, response) => {
-  var attemptedUsername = request.body.username;
-  var attemptedPassword = request.body.password;
+app.post('/login', (req, res) => {
+  var attemptedUsername = req.body.username;
+  var attemptedPassword = req.body.password;
 
   models.Users.get({username: attemptedUsername})
     .then((data) => {
       var success = models.Users.compare(attemptedPassword, data.password, data.salt);
       if (success) {
-        response.redirect('/');
+        res.redirect('/');
       } else {
-        response.redirect('/login');
+        res.redirect('/login');
       }
     })
     .catch(() => {
-      response.redirect('/login');
+      res.redirect('/login');
     });
 });
 /************************************************************/
