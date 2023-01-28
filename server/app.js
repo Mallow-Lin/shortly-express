@@ -21,7 +21,14 @@ app.use(Auth.createSession);
 
 app.get('/',
   (req, res) => {
-    res.render('index');
+    // console.log('reqreqreq', req);
+    if (Auth.verifySession(req.session)) {
+      // res.redirect('/');
+      res.render('index');
+    } else {
+      res.redirect('/login');
+    }
+    // res.render('index');
   });
 
 app.get('/create',
@@ -31,13 +38,17 @@ app.get('/create',
 
 app.get('/links',
   (req, res, next) => {
-    models.Links.getAll()
-      .then(links => {
-        res.status(200).send(links);
-      })
-      .error(error => {
-        res.status(500).send(error);
-      });
+    if ( Auth.verifySession(req.session)) {
+      models.Links.getAll()
+        .then(links => {
+          res.status(200).send(links);
+        })
+        .error(error => {
+          res.status(500).send(error);
+        });
+    } else {
+      res.redirect('/login');
+    }
   });
 
 app.post('/links',

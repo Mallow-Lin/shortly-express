@@ -45,4 +45,6 @@ module.exports.createSession = (req, res, next) => {
 // Add additional authentication middleware functions below
 /************************************************************/
 
-//request has an session object, response has cookies object
+module.exports.verifySession = function(session) {
+  return models.Sessions.isLoggedIn(session);
+};
