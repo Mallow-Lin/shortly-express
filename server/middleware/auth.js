@@ -20,24 +20,26 @@ module.exports.createSession = (req, res, next) => {
     var hash = req.cookies['shortlyid'];
     models.Sessions.get({hash: hash})
       .then((session) => {
-        console.log('session', session);
-        req.session = {};
-        req.session.hash = session.hash;
-        req.session.id = session.userId;
-        req.session.username = session.user.username;
-        next();
+        if (session) {
+          req.session = session;
+          next();
+        } else {
+          models.Sessions.create()
+            .then((data) => {
+              return models.Sessions.get({id: data.insertId});
+            })
+            .then((session) => {
+              var hash = session.hash;
+              res.cookie('shortlyid', hash);
+              next();
+            });
+        }
+      })
+      .catch(() => {
+        console.log(err);
       });
-
   }
 };
-
-// req: {
-//   session: {
-//     hash: hduishdiuhs782738273;
-//     username:
-//     userID:
-//   }
-// }
 
 /************************************************************/
 // Add additional authentication middleware functions below

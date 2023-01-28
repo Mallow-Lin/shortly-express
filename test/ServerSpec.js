@@ -553,6 +553,7 @@ describe('', function() {
         var cookieValue = cookies[0].value;
 
         requestWithSession('http://127.0.0.1:4568/logout', function(error, response, resBody) {
+
           if (error) { return done(error); }
 
           var cookies = cookieJar.getCookies('http://127.0.0.1:4568/');

@@ -3,6 +3,7 @@ const path = require('path');
 const utils = require('./lib/hashUtils');
 const partials = require('express-partials');
 const Auth = require('./middleware/auth');
+const parseCookies = require('./middleware/cookieParser');
 const models = require('./models');
 
 const app = express();
@@ -14,6 +15,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, '../public')));
 
+app.use(parseCookies);
+app.use(Auth.createSession);
 
 
 app.get('/',
@@ -80,12 +83,22 @@ app.post('/signup', (req, res) => {
   var username = req.body.username;
   var password = req.body.password;
 
-  models.Users.create( {username, password} )
-    .then(() => {
-      res.redirect('/');
+  models.Users.get({username: username})
+    .then((user) => {
+      if (user) {
+        res.redirect('/signup');
+      } else {
+        models.Users.create( {username, password} )
+          .then((result) => {
+            models.Sessions.update({hash: req.session.hash}, {userId: result.insertId})
+              .then(() => {
+                res.redirect('/');
+              });
+          });
+      }
     })
     .catch(() => {
-      res.redirect('/signup');
+      console.log(err);
     });
 });
 
@@ -104,6 +117,18 @@ app.post('/login', (req, res) => {
     })
     .catch(() => {
       res.redirect('/login');
+    });
+});
+
+app.get('/logout', (req, res) => {
+  // console.log('req', req);
+  var hash = req.session.hash;
+  models.Sessions.delete({hash: hash}).then(() => {
+    res.clearCookie('shortlyid');
+    res.redirect('/login');
+  })
+    .catch(() => {
+      console.log(err);
     });
 });
 /************************************************************/
