@@ -19,36 +19,25 @@ app.use(parseCookies);
 app.use(Auth.createSession);
 
 
-app.get('/',
-  (req, res) => {
-    // console.log('reqreqreq', req);
-    if (Auth.verifySession(req.session)) {
-      // res.redirect('/');
-      res.render('index');
-    } else {
-      res.redirect('/login');
-    }
-    // res.render('index');
-  });
-
-app.get('/create',
+app.get('/', Auth.verifySession,
   (req, res) => {
     res.render('index');
   });
 
-app.get('/links',
+app.get('/create', Auth.verifySession,
+  (req, res) => {
+    res.render('index');
+  });
+
+app.get('/links', Auth.verifySession,
   (req, res, next) => {
-    if ( Auth.verifySession(req.session)) {
-      models.Links.getAll()
-        .then(links => {
-          res.status(200).send(links);
-        })
-        .error(error => {
-          res.status(500).send(error);
-        });
-    } else {
-      res.redirect('/login');
-    }
+    models.Links.getAll()
+      .then(links => {
+        res.status(200).send(links);
+      })
+      .error(error => {
+        res.status(500).send(error);
+      });
   });
 
 app.post('/links',
@@ -77,7 +66,9 @@ app.post('/links',
         return models.Links.get({ id: results.insertId });
       })
       .then(link => {
-        throw link;
+        if (link) {
+          throw link;
+        }
       })
       .error(error => {
         res.status(500).send(error);
@@ -90,6 +81,13 @@ app.post('/links',
 /************************************************************/
 // Write your authentication routes here
 /************************************************************/
+app.get('/signup', (req, res) => {
+  res.render('signup');
+});
+
+app.get('/login', (req, res) => {
+  res.render('login');
+});
 app.post('/signup', (req, res) => {
   var username = req.body.username;
   var password = req.body.password;
@@ -108,7 +106,7 @@ app.post('/signup', (req, res) => {
           });
       }
     })
-    .catch(() => {
+    .catch((err) => {
       console.log(err);
     });
 });
@@ -126,19 +124,18 @@ app.post('/login', (req, res) => {
         res.redirect('/login');
       }
     })
-    .catch(() => {
+    .catch((err) => {
       res.redirect('/login');
     });
 });
 
 app.get('/logout', (req, res) => {
-  // console.log('req', req);
   var hash = req.session.hash;
   models.Sessions.delete({hash: hash}).then(() => {
     res.clearCookie('shortlyid');
     res.redirect('/login');
   })
-    .catch(() => {
+    .catch((err) => {
       console.log(err);
     });
 });

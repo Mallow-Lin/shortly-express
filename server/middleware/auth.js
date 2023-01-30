@@ -7,12 +7,8 @@ module.exports.createSession = (req, res, next) => {
       .then((data) => {
         models.Sessions.get({id: data.insertId})
           .then((session) => {
-            req.session = {};
-            req.session.hash = session.hash;
-            return session.hash;
-          })
-          .then((hash) => {
-            res.cookie('shortlyid', hash);
+            req.session = session;
+            res.cookie('shortlyid', session.hash);
             next();
           });
       });
@@ -26,25 +22,31 @@ module.exports.createSession = (req, res, next) => {
         } else {
           models.Sessions.create()
             .then((data) => {
-              return models.Sessions.get({id: data.insertId});
-            })
-            .then((session) => {
-              var hash = session.hash;
-              res.cookie('shortlyid', hash);
-              next();
+              models.Sessions.get({id: data.insertId})
+                .then((session) => {
+                  var hash = session.hash;
+                  res.cookie('shortlyid', hash);
+                  next();
+                });
             });
         }
       })
-      .catch(() => {
+      .catch((err) => {
         console.log(err);
       });
+
   }
 };
-
 /************************************************************/
 // Add additional authentication middleware functions below
 /************************************************************/
 
-module.exports.verifySession = function(session) {
-  return models.Sessions.isLoggedIn(session);
+module.exports.verifySession = function(req, res, next) {
+
+  if (models.Sessions.isLoggedIn(req.session)) {
+    next();
+  } else {
+    res.redirect('/login');
+  }
+
 };
