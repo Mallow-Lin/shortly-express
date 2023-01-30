@@ -259,6 +259,23 @@ describe('', function() {
       });
     });
 
+    it('Users that enter an incorrect username are kept on login page', function(done) {
+      var options = {
+        'method': 'POST',
+        'uri': 'http://127.0.0.1:4568/login',
+        'json': {
+          'username': 'Saamantha',
+          'password': 'Samantha'
+        }
+      };
+
+      request(options, function(error, res, body) {
+        if (error) { return done(error); }
+        expect(res.headers.location).to.equal('/login');
+        done();
+      });
+    });
+
     it('Users that enter an incorrect password are kept on login page', function(done) {
       var options = {
         'method': 'POST',
@@ -275,6 +292,20 @@ describe('', function() {
         done();
       });
     });
+
+    it('redirects user to the login page after user logout', function(done) {
+      var options = {
+        'method': 'POST',
+        'uri': 'http://127.0.0.1:4568/logout',
+      };
+
+      request(options, function(error, res, body) {
+        if (error) { return done(error); }
+        expect(res.headers.location).to.equal('/login');
+        done();
+      });
+    });
+
   });
 
   describe('Sessions Schema:', function() {
@@ -369,396 +400,412 @@ describe('', function() {
           done();
         });
       });
-    });
 
-    describe('Session Parser', function() {
-      it('initializes a new session when there are no cookies on the request', function(done) {
-        var requestWithoutCookies = httpMocks.createRequest();
-        var response = httpMocks.createResponse();
+      describe('Session Parser', function() {
+        it('initializes a new session when there are no cookies on the request', function(done) {
+          var requestWithoutCookies = httpMocks.createRequest();
+          var response = httpMocks.createResponse();
 
-        createSession(requestWithoutCookies, response, function() {
-          var session = requestWithoutCookies.session;
-          expect(session).to.exist;
-          expect(session).to.be.an('object');
-          expect(session.hash).to.exist;
-          done();
-        });
-      });
-
-      it('sets a new cookie on the response when a session is initialized', function(done) {
-        var requestWithoutCookie = httpMocks.createRequest();
-        var response = httpMocks.createResponse();
-
-        createSession(requestWithoutCookie, response, function() {
-          var cookies = response.cookies;
-          expect(cookies['shortlyid']).to.exist;
-          expect(cookies['shortlyid'].value).to.exist;
-          done();
-        });
-      });
-
-      it('assigns a session object to the request if a session already exists', function(done) {
-
-        var requestWithoutCookie = httpMocks.createRequest();
-        var response = httpMocks.createResponse();
-
-        createSession(requestWithoutCookie, response, function() {
-          var cookie = response.cookies.shortlyid.value;
-          var secondResponse = httpMocks.createResponse();
-          var requestWithCookies = httpMocks.createRequest();
-          requestWithCookies.cookies.shortlyid = cookie;
-
-          createSession(requestWithCookies, secondResponse, function() {
-            var session = requestWithCookies.session;
+          createSession(requestWithoutCookies, response, function() {
+            var session = requestWithoutCookies.session;
+            expect(session).to.exist;
             expect(session).to.be.an('object');
             expect(session.hash).to.exist;
-            // expect(session.hash).to.be.cookie;  Should we use https://www.npmjs.com/package/chai-http
             done();
           });
         });
-      });
 
-      it('creates a new hash for each new session', function(done) {
-        var requestWithoutCookies = httpMocks.createRequest();
-        var response = httpMocks.createResponse();
-
-        createSession(requestWithoutCookies, response, function() {
-          var sessionHashOne = requestWithoutCookies.session.hash;
-          var secondRequestWithoutCookies = httpMocks.createRequest();
-          var responseTwo = httpMocks.createResponse();
-
-          createSession(secondRequestWithoutCookies, responseTwo, function() {
-            var sessionHashTwo = secondRequestWithoutCookies.session.hash;
-            expect(sessionHashOne).to.not.equal(sessionHashTwo);
-            done();
-          });
-        });
-      });
-
-      it('assigns a username and userId property to the session object if the session is assigned to a user', function(done) {
-        var requestWithoutCookie = httpMocks.createRequest();
-        var response = httpMocks.createResponse();
-        var username = 'BillZito';
-
-        db.query('INSERT INTO users (username) VALUES (?)', username, function(error, results) {
-          if (error) { return done(error); }
-          var userId = results.insertId;
+        it('sets a new cookie on the response when a session is initialized', function(done) {
+          var requestWithoutCookie = httpMocks.createRequest();
+          var response = httpMocks.createResponse();
 
           createSession(requestWithoutCookie, response, function() {
-            var hash = requestWithoutCookie.session.hash;
-            db.query('UPDATE sessions SET userId = ? WHERE hash = ?', [userId, hash], function(error, result) {
+            var cookies = response.cookies;
+            expect(cookies['shortlyid']).to.exist;
+            expect(cookies['shortlyid'].value).to.exist;
+            done();
+          });
+        });
 
-              var secondResponse = httpMocks.createResponse();
-              var requestWithCookies = httpMocks.createRequest();
-              requestWithCookies.cookies.shortlyid = hash;
+        it('assigns a session object to the request if a session already exists', function(done) {
 
-              createSession(requestWithCookies, secondResponse, function() {
-                var session = requestWithCookies.session;
-                expect(session).to.be.an('object');
-                expect(session.user.username).to.eq(username);
-                expect(session.userId).to.eq(userId);
-                done();
+          var requestWithoutCookie = httpMocks.createRequest();
+          var response = httpMocks.createResponse();
+
+          createSession(requestWithoutCookie, response, function() {
+            var cookie = response.cookies.shortlyid.value;
+            var secondResponse = httpMocks.createResponse();
+            var requestWithCookies = httpMocks.createRequest();
+            requestWithCookies.cookies.shortlyid = cookie;
+
+            createSession(requestWithCookies, secondResponse, function() {
+              var session = requestWithCookies.session;
+              expect(session).to.be.an('object');
+              expect(session.hash).to.exist;
+              // expect(session.hash).to.be.cookie;  Should we use https://www.npmjs.com/package/chai-http
+              done();
+            });
+          });
+        });
+
+        it('request session object should include the same user information as stored in the database session', function(done) {
+          var requestWithCookies = httpMocks.createRequest();
+          var response = httpMocks.createResponse();
+
+          createSession(requestWithCookies, response, function() {
+            var cookie = response.cookies.shortlyid.value;
+            var queryString = 'SELECT * FROM sessions WHERE hash = ?';
+            db.query(queryString, cookie, function(error, session) {
+              if (error) { return done(error); }
+              var requestSession = requestWithCookies.session;
+              expect(requestSession.userId).to.equal(session[0].userId);
+              done();
+            });
+          });
+        });
+
+        it('creates a new hash for each new session', function(done) {
+          var requestWithoutCookies = httpMocks.createRequest();
+          var response = httpMocks.createResponse();
+
+          createSession(requestWithoutCookies, response, function() {
+            var sessionHashOne = requestWithoutCookies.session.hash;
+            var secondRequestWithoutCookies = httpMocks.createRequest();
+            var responseTwo = httpMocks.createResponse();
+
+            createSession(secondRequestWithoutCookies, responseTwo, function() {
+              var sessionHashTwo = secondRequestWithoutCookies.session.hash;
+              expect(sessionHashOne).to.not.equal(sessionHashTwo);
+              done();
+            });
+          });
+        });
+
+        it('assigns a username and userId property to the session object if the session is assigned to a user', function(done) {
+          var requestWithoutCookie = httpMocks.createRequest();
+          var response = httpMocks.createResponse();
+          var username = 'BillZito';
+
+          db.query('INSERT INTO users (username) VALUES (?)', username, function(error, results) {
+            if (error) { return done(error); }
+            var userId = results.insertId;
+
+            createSession(requestWithoutCookie, response, function() {
+              var hash = requestWithoutCookie.session.hash;
+              db.query('UPDATE sessions SET userId = ? WHERE hash = ?', [userId, hash], function(error, result) {
+
+                var secondResponse = httpMocks.createResponse();
+                var requestWithCookies = httpMocks.createRequest();
+                requestWithCookies.cookies.shortlyid = hash;
+
+                createSession(requestWithCookies, secondResponse, function() {
+                  var session = requestWithCookies.session;
+                  expect(session).to.be.an('object');
+                  expect(session.user.username).to.eq(username);
+                  expect(session.userId).to.eq(userId);
+                  done();
+                });
               });
+            });
+          });
+        });
+
+        it('clears and reassigns a new cookie if there is no session assigned to the cookie', function(done) {
+          var maliciousCookieHash = '8a864482005bcc8b968f2b18f8f7ea490e577b20';
+          var response = httpMocks.createResponse();
+          var requestWithMaliciousCookie = httpMocks.createRequest();
+          requestWithMaliciousCookie.cookies.shortlyid = maliciousCookieHash;
+
+          createSession(requestWithMaliciousCookie, response, function() {
+            var cookie = response.cookies.shortlyid;
+            expect(cookie).to.exist;
+            expect(cookie).to.not.equal(maliciousCookieHash);
+            done();
+          });
+        });
+      });
+    });
+
+    describe('Sessions and cookies', function() {
+      var requestWithSession;
+      var cookieJar;
+
+      var addUser = function(callback) {
+
+        var options = {
+          'method': 'POST',
+          'uri': 'http://127.0.0.1:4568/signup',
+          'json': {
+            'username': 'Vivian',
+            'password': 'Vivian'
+          }
+        };
+
+        requestWithSession(options, callback);
+      };
+
+      beforeEach(function(done) {
+        cookieJar = request.jar();
+        requestWithSession = request.defaults({ jar: cookieJar });
+        done();
+      });
+
+      it('saves a new session when the server receives a request', function(done) {
+        requestWithSession('http://127.0.0.1:4568/', function(err, res, body) {
+          if (err) { return done(err); }
+          var queryString = 'SELECT * FROM sessions';
+          db.query(queryString, function(error, sessions) {
+            if (error) { return done(error); }
+            expect(sessions.length).to.equal(1);
+            expect(sessions[0].userId).to.be.null;
+            done();
+          });
+        });
+      });
+
+      it('sets and stores a cookie on the client', function(done) {
+        requestWithSession('http://127.0.0.1:4568/', function(error, res, body) {
+          if (error) { return done(error); }
+          var cookies = cookieJar.getCookies('http://127.0.0.1:4568/');
+          expect(cookies.length).to.equal(1);
+          done();
+        });
+      });
+
+      it('assigns session to a user when user logs in', function(done) {
+        addUser(function(err, res, body) {
+          if (err) { return done(err); }
+          var cookies = cookieJar.getCookies('http://127.0.0.1:4568/');
+          var cookieValue = cookies[0].value;
+
+          var queryString = `
+          SELECT users.username FROM users, sessions
+          WHERE sessions.hash = ? AND users.id = sessions.userId
+        `;
+
+          db.query(queryString, cookieValue, function(error, users) {
+            if (error) { return done(error); }
+            var user = users[0];
+            expect(user.username).to.equal('Vivian');
+            done();
+          });
+        });
+      });
+
+      it('destroys session and cookie when logs out', function(done) {
+        addUser(function(err, res, body) {
+          if (err) { return done(err); }
+          var cookies = cookieJar.getCookies('http://127.0.0.1:4568/');
+          var cookieValue = cookies[0].value;
+
+          requestWithSession('http://127.0.0.1:4568/logout', function(error, response, resBody) {
+
+            if (error) { return done(error); }
+
+            var cookies = cookieJar.getCookies('http://127.0.0.1:4568/');
+            var newCookieValue = cookies[0].value;
+            expect(cookieValue).to.not.equal(newCookieValue);
+
+            var queryString = 'SELECT * FROM sessions WHERE hash = ?';
+            db.query(queryString, cookieValue, function(error2, sessions) {
+              if (error2) { return done(error2); }
+              expect(sessions.length).to.equal(0);
+              done();
+            });
+          });
+        });
+      });
+    });
+
+    describe('Privileged Access:', function() {
+
+      it('Redirects to login page if a user tries to access the main page and is not signed in', function(done) {
+        request('http://127.0.0.1:4568/', function(error, res, body) {
+          if (error) { return done(error); }
+          expect(res.req.path).to.equal('/login');
+          done();
+        });
+      });
+
+      it('Redirects to login page if a user tries to access the create page and is not signed in', function(done) {
+        request('http://127.0.0.1:4568/create', function(error, res, body) {
+          if (error) { return done(error); }
+          expect(res.req.path).to.equal('/login');
+          done();
+        });
+      });
+
+      it('Redirects to login page if a user tries to see all of the links and is not signed in', function(done) {
+        request('http://127.0.0.1:4568/links', function(error, res, body) {
+          if (error) { return done(error); }
+          expect(res.req.path).to.equal('/login');
+          done();
+        });
+      });
+    });
+
+    describe('Link creation:', function() {
+
+      var cookies = request.jar();
+      var requestWithSession = request.defaults({ jar: cookies });
+      var options = {
+        'method': 'POST',
+        'followAllRedirects': true,
+        'uri': 'http://127.0.0.1:4568/links',
+        'json': {
+          'url': 'http://www.google.com/'
+        }
+      };
+
+      xbeforeEach(function(done) {
+        var options = {
+          'method': 'POST',
+          'followAllRedirects': true,
+          'uri': 'http://127.0.0.1:4568/signup',
+          'json': {
+            'username': 'Vivian',
+            'password': 'Vivian'
+          }
+        };
+        requestWithSession(options, done);
+      });
+
+      afterEach(function(done) {
+        requestWithSession('http://127.0.0.1:4568/logout', done);
+      });
+
+      describe('Creating new links:', function(done) {
+
+        it('Only shortens valid urls, returning a 404 - Not found for invalid urls', function(done) {
+          var options = {
+            'method': 'POST',
+            'uri': 'http://127.0.0.1:4568/links',
+            'json': {
+              'url': 'definitely not a valid url'
+            }
+          };
+
+          requestWithSession(options, function(error, res, body) {
+            if (error) { return done(error); }
+            expect(res.statusCode).to.equal(404);
+            done();
+          });
+        });
+
+        it('Responds with the short code', function(done) {
+
+          requestWithSession(options, function(error, res, body) {
+            if (error) { return done(error); }
+            expect(res.body.url).to.equal('http://www.google.com/');
+            expect(res.body.code).to.not.be.null;
+            done();
+          });
+        });
+
+        it('New links create a database entry', function(done) {
+          requestWithSession(options, function(error, res, body) {
+            if (error) { return done(error); }
+            db.query('SELECT * FROM links WHERE url = "http://www.google.com/"', function(err, links) {
+              var foundUrl;
+              if (err) { return done(err); }
+              if (links[0] && links[0]['url']) {
+                foundUrl = links['0']['url'];
+              }
+              expect(foundUrl).to.equal('http://www.google.com/');
+              done();
+            });
+          });
+        });
+
+        it('Fetches the link url title', function(done) {
+          requestWithSession(options, function(error, res, body) {
+            if (error) { return done(error); }
+            db.query('SELECT * FROM links WHERE title = "Google"', function(err, links) {
+              if (err) { return done(err); }
+              var foundUrl = links[0];
+              expect(foundUrl).to.exist;
+
+              var linkTitle = foundUrl.title;
+              expect(linkTitle).to.equal('Google');
+              done();
             });
           });
         });
       });
 
-      it('clears and reassigns a new cookie if there is no session assigned to the cookie', function(done) {
-        var maliciousCookieHash = '8a864482005bcc8b968f2b18f8f7ea490e577b20';
-        var response = httpMocks.createResponse();
-        var requestWithMaliciousCookie = httpMocks.createRequest();
-        requestWithMaliciousCookie.cookies.shortlyid = maliciousCookieHash;
+      describe('With previously saved urls:', function() {
 
-        createSession(requestWithMaliciousCookie, response, function() {
-          var cookie = response.cookies.shortlyid;
-          expect(cookie).to.exist;
-          expect(cookie).to.not.equal(maliciousCookieHash);
-          done();
-        });
-      });
-    });
-  });
+        var link;
 
-  describe('Sessions and cookies', function() {
-    var requestWithSession;
-    var cookieJar;
-
-    var addUser = function(callback) {
-
-      var options = {
-        'method': 'POST',
-        'uri': 'http://127.0.0.1:4568/signup',
-        'json': {
-          'username': 'Vivian',
-          'password': 'Vivian'
-        }
-      };
-
-      requestWithSession(options, callback);
-    };
-
-    beforeEach(function(done) {
-      cookieJar = request.jar();
-      requestWithSession = request.defaults({ jar: cookieJar });
-      done();
-    });
-
-    it('saves a new session when the server receives a request', function(done) {
-      requestWithSession('http://127.0.0.1:4568/', function(err, res, body) {
-        if (err) { return done(err); }
-        var queryString = 'SELECT * FROM sessions';
-        db.query(queryString, function(error, sessions) {
-          if (error) { return done(error); }
-          expect(sessions.length).to.equal(1);
-          expect(sessions[0].userId).to.be.null;
-          done();
-        });
-      });
-    });
-
-    it('sets and stores a cookie on the client', function(done) {
-      requestWithSession('http://127.0.0.1:4568/', function(error, res, body) {
-        if (error) { return done(error); }
-        var cookies = cookieJar.getCookies('http://127.0.0.1:4568/');
-        expect(cookies.length).to.equal(1);
-        done();
-      });
-    });
-
-    it('assigns session to a user when user logs in', function(done) {
-      addUser(function(err, res, body) {
-        if (err) { return done(err); }
-        var cookies = cookieJar.getCookies('http://127.0.0.1:4568/');
-        var cookieValue = cookies[0].value;
-
-        var queryString = `
-          SELECT users.username FROM users, sessions
-          WHERE sessions.hash = ? AND users.id = sessions.userId
-        `;
-
-        db.query(queryString, cookieValue, function(error, users) {
-          if (error) { return done(error); }
-          var user = users[0];
-          expect(user.username).to.equal('Vivian');
-          done();
-        });
-      });
-    });
-
-    it('destroys session and cookie when logs out', function(done) {
-      addUser(function(err, res, body) {
-        if (err) { return done(err); }
-        var cookies = cookieJar.getCookies('http://127.0.0.1:4568/');
-        var cookieValue = cookies[0].value;
-
-        requestWithSession('http://127.0.0.1:4568/logout', function(error, response, resBody) {
-
-          if (error) { return done(error); }
-
-          var cookies = cookieJar.getCookies('http://127.0.0.1:4568/');
-          var newCookieValue = cookies[0].value;
-          expect(cookieValue).to.not.equal(newCookieValue);
-
-          var queryString = 'SELECT * FROM sessions WHERE hash = ?';
-          db.query(queryString, cookieValue, function(error2, sessions) {
-            if (error2) { return done(error2); }
-            expect(sessions.length).to.equal(0);
-            done();
-          });
-        });
-      });
-    });
-  });
-
-  describe('Privileged Access:', function() {
-
-    it('Redirects to login page if a user tries to access the main page and is not signed in', function(done) {
-      request('http://127.0.0.1:4568/', function(error, res, body) {
-        if (error) { return done(error); }
-        expect(res.req.path).to.equal('/login');
-        done();
-      });
-    });
-
-    it('Redirects to login page if a user tries to access the create page and is not signed in', function(done) {
-      request('http://127.0.0.1:4568/create', function(error, res, body) {
-        if (error) { return done(error); }
-        expect(res.req.path).to.equal('/login');
-        done();
-      });
-    });
-
-    it('Redirects to login page if a user tries to see all of the links and is not signed in', function(done) {
-      request('http://127.0.0.1:4568/links', function(error, res, body) {
-        if (error) { return done(error); }
-        expect(res.req.path).to.equal('/login');
-        done();
-      });
-    });
-  });
-
-  describe('Link creation:', function() {
-
-    var cookies = request.jar();
-    var requestWithSession = request.defaults({ jar: cookies });
-    var options = {
-      'method': 'POST',
-      'followAllRedirects': true,
-      'uri': 'http://127.0.0.1:4568/links',
-      'json': {
-        'url': 'http://www.google.com/'
-      }
-    };
-
-    xbeforeEach(function(done) {
-      var options = {
-        'method': 'POST',
-        'followAllRedirects': true,
-        'uri': 'http://127.0.0.1:4568/signup',
-        'json': {
-          'username': 'Vivian',
-          'password': 'Vivian'
-        }
-      };
-      requestWithSession(options, done);
-    });
-
-    afterEach(function(done) {
-      requestWithSession('http://127.0.0.1:4568/logout', done);
-    });
-
-    describe('Creating new links:', function(done) {
-
-      it('Only shortens valid urls, returning a 404 - Not found for invalid urls', function(done) {
-        var options = {
-          'method': 'POST',
-          'uri': 'http://127.0.0.1:4568/links',
-          'json': {
-            'url': 'definitely not a valid url'
-          }
-        };
-
-        requestWithSession(options, function(error, res, body) {
-          if (error) { return done(error); }
-          expect(res.statusCode).to.equal(404);
-          done();
-        });
-      });
-
-      it('Responds with the short code', function(done) {
-
-        requestWithSession(options, function(error, res, body) {
-          if (error) { return done(error); }
-          expect(res.body.url).to.equal('http://www.google.com/');
-          expect(res.body.code).to.not.be.null;
-          done();
-        });
-      });
-
-      it('New links create a database entry', function(done) {
-        requestWithSession(options, function(error, res, body) {
-          if (error) { return done(error); }
-          db.query('SELECT * FROM links WHERE url = "http://www.google.com/"', function(err, links) {
-            var foundUrl;
-            if (err) { return done(err); }
-            if (links[0] && links[0]['url']) {
-              foundUrl = links['0']['url'];
-            }
-            expect(foundUrl).to.equal('http://www.google.com/');
-            done();
-          });
-        });
-      });
-
-      it('Fetches the link url title', function(done) {
-        requestWithSession(options, function(error, res, body) {
-          if (error) { return done(error); }
-          db.query('SELECT * FROM links WHERE title = "Google"', function(err, links) {
-            if (err) { return done(err); }
-            var foundUrl = links[0];
-            expect(foundUrl).to.exist;
-
-            var linkTitle = foundUrl.title;
-            expect(linkTitle).to.equal('Google');
-            done();
-          });
-        });
-      });
-    });
-
-    describe('With previously saved urls:', function() {
-
-      var link;
-
-      beforeEach(function(done) {
+        beforeEach(function(done) {
         // save a link to the database
-        link = {
-          url: 'http://www.google.com/',
-          title: 'Google',
-          baseUrl: 'http://127.0.0.1:4568',
-          code: '2387f'
-        };
-        db.query('INSERT INTO links SET ?', link, done);
-      });
-
-      it('Returns the same shortened code', function(done) {
-        var options = {
-          'method': 'POST',
-          'followAllRedirects': true,
-          'uri': 'http://127.0.0.1:4568/links',
-          'json': {
-            'url': 'http://www.google.com/'
-          }
-        };
-
-        requestWithSession(options, function(error, res, body) {
-          if (error) { return done(error); }
-          var code = res.body.code;
-          expect(code).to.equal(link.code);
-          done();
+          link = {
+            url: 'http://www.google.com/',
+            title: 'Google',
+            baseUrl: 'http://127.0.0.1:4568',
+            code: '2387f'
+          };
+          db.query('INSERT INTO links SET ?', link, done);
         });
-      });
 
-      it('Shortcode redirects to correct url', function(done) {
-        var options = {
-          'method': 'GET',
-          'uri': 'http://127.0.0.1:4568/' + link.code
-        };
+        it('Returns the same shortened code', function(done) {
+          var options = {
+            'method': 'POST',
+            'followAllRedirects': true,
+            'uri': 'http://127.0.0.1:4568/links',
+            'json': {
+              'url': 'http://www.google.com/'
+            }
+          };
 
-        requestWithSession(options, function(error, res, body) {
-          if (error) { return done(error); }
-          var currentLocation = res.request.href;
-          expect(currentLocation).to.equal('http://www.google.com/');
-          done();
+          requestWithSession(options, function(error, res, body) {
+            if (error) { return done(error); }
+            var code = res.body.code;
+            expect(code).to.equal(link.code);
+            done();
+          });
         });
-      });
 
-      it('Shortcode redirects to index if shortcode does not exist', function(done) {
-        var options = {
-          'method': 'GET',
-          'uri': 'http://127.0.0.1:4568/doesNotExist'
-        };
+        it('Shortcode redirects to correct url', function(done) {
+          var options = {
+            'method': 'GET',
+            'uri': 'http://127.0.0.1:4568/' + link.code
+          };
 
-        requestWithSession(options, function(error, res, body) {
-          if (error) { return done(error); }
-          var currentLocation = res.request.href;
-          expect(currentLocation).to.equal('http://127.0.0.1:4568/');
-          done();
+          requestWithSession(options, function(error, res, body) {
+            if (error) { return done(error); }
+            var currentLocation = res.request.href;
+            expect(currentLocation).to.equal('http://www.google.com/');
+            done();
+          });
         });
-      });
 
-      it('Returns all of the links to display on the links page', function(done) {
-        var options = {
-          'method': 'GET',
-          'uri': 'http://127.0.0.1:4568/links'
-        };
+        it('Shortcode redirects to index if shortcode does not exist', function(done) {
+          var options = {
+            'method': 'GET',
+            'uri': 'http://127.0.0.1:4568/doesNotExist'
+          };
 
-        requestWithSession(options, function(error, res, body) {
-          if (error) { return done(error); }
-          expect(body).to.include('"title":"Google"');
-          expect(body).to.include('"code":"' + link.code + '"');
-          done();
+          requestWithSession(options, function(error, res, body) {
+            if (error) { return done(error); }
+            var currentLocation = res.request.href;
+            expect(currentLocation).to.equal('http://127.0.0.1:4568/');
+            done();
+          });
+        });
+
+        it('Returns all of the links to display on the links page', function(done) {
+          var options = {
+            'method': 'GET',
+            'uri': 'http://127.0.0.1:4568/links'
+          };
+
+          requestWithSession(options, function(error, res, body) {
+            if (error) { return done(error); }
+            expect(body).to.include('"title":"Google"');
+            expect(body).to.include('"code":"' + link.code + '"');
+            done();
+          });
         });
       });
     });

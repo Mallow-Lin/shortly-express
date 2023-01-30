@@ -116,16 +116,20 @@ app.post('/login', (req, res) => {
   var attemptedPassword = req.body.password;
 
   models.Users.get({username: attemptedUsername})
-    .then((data) => {
-      var success = models.Users.compare(attemptedPassword, data.password, data.salt);
-      if (success) {
-        res.redirect('/');
+    .then((user) => {
+      if (user) {
+        var success = models.Users.compare(attemptedPassword, user.password, user.salt);
+        if (success) {
+          res.redirect('/');
+        } else {
+          res.redirect('/login');
+        }
       } else {
         res.redirect('/login');
       }
     })
     .catch((err) => {
-      res.redirect('/login');
+      console.log(err);
     });
 });
 
@@ -139,6 +143,11 @@ app.get('/logout', (req, res) => {
       console.log(err);
     });
 });
+
+app.post('/logout', (req, res) => {
+  res.redirect('/login');
+});
+
 /************************************************************/
 // Handle the code parameter route last - if all other routes fail
 // assume the route is a short code and try and handle it here.
